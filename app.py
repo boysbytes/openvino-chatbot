@@ -11,15 +11,15 @@ from transformers import AutoTokenizer
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 
-# Load environment variables for easy updates
+# Load environment variables
 MODEL_PATH = os.getenv('MODEL_PATH', '/app/models/DeepSeek-R1-Distill-Qwen-1.5B-openvino/1')
 DEFAULT_TEMPERATURE = float(os.getenv('DEFAULT_TEMPERATURE', 0.7))
-MAX_LENGTH = int(os.getenv('MAX_LENGTH', 4096))  # Allows enough space for long responses
+MAX_LENGTH = int(os.getenv('MAX_LENGTH', 4096))
 THREADS = int(os.getenv('INFERENCE_THREADS', 12))
 MAX_WORKERS = int(os.getenv('MAX_WORKERS', 8))
 MEMORY_SIZE = int(os.getenv('MEMORY_SIZE', 3))  # Keeps last 3 interactions
 
-# Centralized Prompt Template (EASY TO UPDATE)
+# Prompt Template
 PROMPT_TEMPLATE = """You are an AI chatbot trained to have helpful, engaging conversations.
 You must show your reasoning step by step when answering complex queries.
 
@@ -29,12 +29,11 @@ AI:"""
 
 # Function to format the prompt with conversation history
 def format_prompt(user_input, memory):
-    # Merge past messages into formatted history
     conversation_history = "\n".join(memory) if memory else ""
 
     # Trim history dynamically to fit within `MAX_LENGTH`
     while len(tokenizer(conversation_history + user_input)["input_ids"]) > MAX_LENGTH - 2048 and memory:
-        memory.popleft()  # Remove the oldest messages first to leave space for response
+        memory.popleft()
 
     return PROMPT_TEMPLATE.format(conversation_history=conversation_history, user_input=user_input)
 
@@ -52,7 +51,7 @@ def validate_model(model_path: str):
     if missing:
         raise FileNotFoundError(f"Missing critical model files in {model_path}: {missing}")
 
-# Validate user input (prevent empty or too-long messages)
+# Validate user input
 def validate_input(prompt: str):
     if not prompt.strip():
         raise ValueError("Empty input")
@@ -60,7 +59,7 @@ def validate_input(prompt: str):
         raise ValueError(f"Input exceeds {MAX_LENGTH} characters")
 
 # Initialize per-user conversation memory
-user_memory = {}  # Stores chat history per user
+user_memory = {}
 
 # Load model
 try:
@@ -98,13 +97,12 @@ def safe_generate_response(prompt, memory, temperature=DEFAULT_TEMPERATURE):
 
     outputs = model.generate(
         **inputs, 
-        max_new_tokens=2048,  # Allows long responses with step-by-step reasoning
+        max_new_tokens=2048,
         temperature=temperature,
         top_p=0.9,
         do_sample=True
     )
     return tokenizer.decode(outputs[0], skip_special_tokens=True)
-
 
 # ThreadPoolExecutor for parallel processing
 executor = ThreadPoolExecutor(max_workers=MAX_WORKERS)
@@ -112,41 +110,39 @@ executor = ThreadPoolExecutor(max_workers=MAX_WORKERS)
 async def generate_response_async(user_id, prompt, temperature=DEFAULT_TEMPERATURE):
     loop = asyncio.get_event_loop()
 
-    # Retrieve user memory or initialize it
     if user_id not in user_memory:
-        user_memory[user_id] = deque(maxlen=MEMORY_SIZE)  # Store last N exchanges
+        user_memory[user_id] = deque(maxlen=MEMORY_SIZE)
 
     return await loop.run_in_executor(
         executor, 
         lambda: safe_generate_response(prompt, user_memory[user_id], temperature=temperature)
     )
 
-# Startup message
+# Startup message with session reset
 @cl.on_chat_start
 async def start_chat():
+    user_id = str(os.urandom(16))  # Generate unique session ID
+    cl.user_session.set("user_id", user_id)
+
+    # Reset user memory for new session
+    user_memory[user_id] = deque(maxlen=MEMORY_SIZE)
+
     status = "Healthy" if hasattr(model, "device") else "Degraded"
     await cl.Message(f"System ready | Status: {status} | Threads: {THREADS} | Memory Size: {MEMORY_SIZE} exchanges").send()
 
-# Handle incoming user messages
+# Handle user messages
 @cl.on_message
 async def handle_message(message: cl.Message):
     try:
         validate_input(message.content)
 
-        # Use Chainlit session storage instead of `session_id`
         user_id = cl.user_session.get("user_id")
 
-        # If no user ID exists, create one
-        if user_id is None:
-            user_id = message.author  # Assign user-specific ID
-            cl.user_session.set("user_id", user_id)
-
-        # Extract temperature if provided
-        user_temp = float(message.metadata.get("temperature", DEFAULT_TEMPERATURE))
-
-        # Ensure user memory exists
+        # Ensure user memory is initialized
         if user_id not in user_memory:
-            user_memory[user_id] = deque(maxlen=MEMORY_SIZE) 
+            user_memory[user_id] = deque(maxlen=MEMORY_SIZE)
+
+        user_temp = float(message.metadata.get("temperature", DEFAULT_TEMPERATURE))
 
         # Generate response with memory
         response = await generate_response_async(user_id, message.content, temperature=user_temp)
@@ -159,7 +155,6 @@ async def handle_message(message: cl.Message):
     except Exception as e:
         await cl.Message(f"Error processing request: {str(e)}").send()
         raise
-
 
 if __name__ == "__main__":
     asyncio.run(cl.run())

@@ -12,7 +12,7 @@ USER $NB_UID:$NB_GID
 
 WORKDIR /app
 
-# Install Python dependencies with updated versions
+# Install Python dependencies
 RUN pip install --no-cache-dir \
     chainlit==2.1.0 \
     "optimum[openvino]==1.20.0" \
@@ -22,7 +22,6 @@ RUN pip install --no-cache-dir \
 
 # Copy application files
 COPY models/DeepSeek-R1-Distill-Qwen-1.5B-openvino/1 /app/models/DeepSeek-R1-Distill-Qwen-1.5B-openvino/1
-# COPY models/Qwen2.5-0.5B-Instruct-openvino-4bit/1 /app/models/Qwen2.5-0.5B-Instruct-openvino-4bit/1
 COPY app.py .
 
 EXPOSE 3000
