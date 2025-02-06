@@ -1,8 +1,6 @@
 # Chatbot (OpenVINO and Chainlit)
 
-This is a chatbot powered by **OpenVINO**, running a DeepSeek-R1-Distill-Qwen-1.5B model. It uses **Chainlit** for conversational interactions and supports memory retention across exchanges.
-
----
+This is a chatbot powered by [**OpenVINO**](https://www.intel.com/content/www/us/en/developer/tools/openvino-toolkit/overview.html), running a DeepSeek-R1-Distill-Qwen-1.5B model. It uses [**Chainlit**](https://docs.chainlit.io/get-started/overview) for conversational interactions and supports memory retention across exchanges.
 
 ## Key Features
 
@@ -37,11 +35,6 @@ This is a chatbot powered by **OpenVINO**, running a DeepSeek-R1-Distill-Qwen-1.
     docker-compose build
     docker-compose up -d
     ```
-
-    This will:
-    - build the chatbot container
-    - expose the API on **port 3000**
-    - restart on failures automatically
 
 ## Usage
 
