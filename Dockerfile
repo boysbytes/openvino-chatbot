@@ -18,11 +18,13 @@ RUN pip install --no-cache-dir \
     "optimum[openvino]==1.20.0" \
     openvino==2024.6.0 \
     transformers==4.40.0 \
-    intel-extension-for-transformers==1.3.0
+    intel-extension-for-transformers==1.3.0 \
+    python-dotenv
 
 # Copy application files
 COPY models/DeepSeek-R1-Distill-Qwen-1.5B-openvino/1 /app/models/DeepSeek-R1-Distill-Qwen-1.5B-openvino/1
-COPY app.py .
+COPY app.py . 
+COPY .env .
 
 EXPOSE 3000
 

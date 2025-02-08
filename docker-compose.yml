@@ -1,5 +1,3 @@
-
-
 services:
   chatbot:
     container_name: ov-chatbot
@@ -8,17 +6,6 @@ services:
       - "3000:3000"
     volumes:
       - ./models:/app/models
-    environment:
-     - MODEL_PATH=/app/models/DeepSeek-R1-Distill-Qwen-1.5B-openvino/1
-#       - MODEL_PATH=/app/models/Qwen2.5-0.5B-Instruct-openvino-4bit/1
-    deploy:
-      resources:
-        limits: {}
-
-    # Removed cap_add: - SYS_ADMIN
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+    env_file:
+      - .env
     restart: unless-stopped

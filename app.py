@@ -5,19 +5,24 @@ import asyncio
 from pathlib import Path
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
+from dotenv import load_dotenv
 from optimum.intel import OVModelForCausalLM
 from transformers import AutoTokenizer
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 
-# Load environment variables
+# Load environment variables with defaults
 MODEL_PATH = os.getenv('MODEL_PATH', '/app/models/DeepSeek-R1-Distill-Qwen-1.5B-openvino/1')
 DEFAULT_TEMPERATURE = float(os.getenv('DEFAULT_TEMPERATURE', 0.7))
 MAX_LENGTH = int(os.getenv('MAX_LENGTH', 4096))
 THREADS = int(os.getenv('INFERENCE_THREADS', 12))
 MAX_WORKERS = int(os.getenv('MAX_WORKERS', 8))
 MEMORY_SIZE = int(os.getenv('MEMORY_SIZE', 3))  # Keeps last 3 interactions
+MAX_NEW_TOKENS = int(os.getenv('MAX_NEW_TOKENS', 2048))
 
 # Prompt Template
 PROMPT_TEMPLATE = """You are an AI chatbot trained to have helpful, engaging conversations.
@@ -73,7 +78,7 @@ try:
     model = OVModelForCausalLM.from_pretrained(
         MODEL_PATH,
         ov_config={
-            "PERFORMANCE_HINT": "THROUGHPUT",
+            "PERFORMANCE_HINT": "LATENCY",
             "INFERENCE_NUM_THREADS": THREADS,
             "CACHE_DIR": "/app/cache"
         },
@@ -97,7 +102,7 @@ def safe_generate_response(prompt, memory, temperature=DEFAULT_TEMPERATURE):
 
     outputs = model.generate(
         **inputs, 
-        max_new_tokens=2048,
+        max_new_tokens=MAX_NEW_TOKENS,
         temperature=temperature,
         top_p=0.9,
         do_sample=True
