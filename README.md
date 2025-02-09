@@ -25,9 +25,9 @@ This is a chatbot powered by [**OpenVINO**](https://www.intel.com/content/www/us
     python3 download_model.py
     ```
 
-    When prompted, enter the path of the model repo: **hsuwill000/DeepSeek-R1-Distill-Qwen-1.5B-openvino**
+    When prompted, enter the path of the model repo, for example, `https://huggingface.co/boysbytes/DeepSeek-R1-Distill-Qwen-1.5B-openvino-8bit`
 
-    The model files will be saved to `models/DeepSeek-R1-Distill-Qwen-1.5B-openvino/1`
+    The model files will be saved to `models/DeepSeek-R1-Distill-Qwen-1.5B-openvino-8bit/1`
 
 2. Build and run the service.
 
@@ -50,16 +50,17 @@ This is a chatbot powered by [**OpenVINO**](https://www.intel.com/content/www/us
 ## Configuration
 
 ### Customize environment variables
-The following are the environment variables you can customize in `app.py`.
+The following are the environment variables you can customize in `.env`.
 
 | Variable           | Default Value | Description |
 |--------------------|--------------|-------------|
-| `MODEL_PATH`      | `/app/models/DeepSeek-R1-Distill-Qwen-1.5B-openvino/1` | Path to OpenVINO model |
+| `MODEL_PATH`      | `/app/models/DeepSeek-R1-Distill-Qwen-1.5B-openvino-8bit/1` | Path to OpenVINO model |
 | `DEFAULT_TEMPERATURE` | `0.7` | Controls response randomness |
-| `MAX_LENGTH`      | `4096` | Max input size |
+| `MAX_LENGTH`      | `8192` | Max input size |
 | `INFERENCE_THREADS` | `12` | OpenVINO inference threads |
 | `MAX_WORKERS`     | `8` | Parallel request handling |
 | `MEMORY_SIZE`     | `3` | Number of previous exchanges to remember |
+| `MAX_NEW_TOKENS`     | `4096` | Max response size |
 
 ### Change the model
 
@@ -69,17 +70,15 @@ The following are the environment variables you can customize in `app.py`.
     python3 download_model.py
     ```
 
-    When prompted, enter the path of the model repo.
+    When prompted, enter the path of the model repo, for example, `https://huggingface.co/boysbytes/DeepSeek-R1-Distill-Qwen-1.5B-openvino-8bit`.
 
-    For example, if the model repo URL is `https://huggingface.co/HelloSun/Qwen2.5-3B-Instruct-openvino`, then enter the path `HelloSun/Qwen2.5-3B-Instruct-openvino`.
-
-2. Update the model in `app.py`, `Dockerfile`, and `docker-compose.yml`. 
+2. Update the model path in `.env`. 
 
 ## Troubleshooting
 
 **Model Not Found**  
 - Ensure the model files are inside `models/` directory.
-- Check the model path in `app.py`, `Dockerfile`, and `docker-compose.yml`.
+- Check the model path in `.env`.
 
 **High CPU Usage**  
 - Reduce `INFERENCE_THREADS` and `MAX_WORKERS`.

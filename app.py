@@ -16,21 +16,20 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 
 # Load environment variables with defaults
-MODEL_PATH = os.getenv('MODEL_PATH', '/app/models/DeepSeek-R1-Distill-Qwen-1.5B-openvino/1')
+MODEL_PATH = os.getenv('MODEL_PATH', '/app/models/DeepSeek-R1-Distill-Qwen-1.5B-openvino-8bit/1')
+TOKENIZER_MODEL = os.getenv('TOKENIZER_MODEL', 'boysbytes/DeepSeek-R1-Distill-Qwen-1.5B-openvino-8bit')
 DEFAULT_TEMPERATURE = float(os.getenv('DEFAULT_TEMPERATURE', 0.7))
-MAX_LENGTH = int(os.getenv('MAX_LENGTH', 4096))
+MAX_LENGTH = int(os.getenv('MAX_LENGTH', 8192))
 THREADS = int(os.getenv('INFERENCE_THREADS', 12))
 MAX_WORKERS = int(os.getenv('MAX_WORKERS', 8))
 MEMORY_SIZE = int(os.getenv('MEMORY_SIZE', 3))  # Keeps last 3 interactions
-MAX_NEW_TOKENS = int(os.getenv('MAX_NEW_TOKENS', 2048))
+MAX_NEW_TOKENS = int(os.getenv('MAX_NEW_TOKENS', 4096))
 
 # Prompt Template
-PROMPT_TEMPLATE = """You are an AI chatbot trained to have helpful, engaging conversations.
-You must show your reasoning step by step when answering complex queries.
-
-{conversation_history}
+PROMPT_TEMPLATE = """{conversation_history}
 User: {user_input}
 AI:"""
+
 
 # Function to format the prompt with conversation history
 def format_prompt(user_input, memory):
@@ -86,12 +85,13 @@ try:
     )
     model.compile()
 
-    tokenizer = AutoTokenizer.from_pretrained("hsuwill000/DeepSeek-R1-Distill-Qwen-1.5B-openvino")
+    # Load tokenizer dynamically from .env
+    tokenizer = AutoTokenizer.from_pretrained(TOKENIZER_MODEL)
     tokenizer.pad_token_id = tokenizer.eos_token_id
 
     logging.info(f"Model and tokenizer loaded successfully with {THREADS} inference threads")
 except Exception as e:
-    logging.critical(f"Failed to load OpenVINO model: {str(e)}")
+    logging.critical(f"Failed to load OpenVINO model or tokenizer: {str(e)}")
     raise
 
 # Generate response with memory
@@ -131,6 +131,10 @@ async def start_chat():
 
     # Reset user memory for new session
     user_memory[user_id] = deque(maxlen=MEMORY_SIZE)
+
+    # Inject system message to guide the chatbot
+    user_memory[user_id].append("System: You are an AI chatbot trained to assist users with clear, concise, and logical responses.")
+
 
     status = "Healthy" if hasattr(model, "device") else "Degraded"
     await cl.Message(f"System ready | Status: {status} | Threads: {THREADS} | Memory Size: {MEMORY_SIZE} exchanges").send()

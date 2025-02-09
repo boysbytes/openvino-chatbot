@@ -22,7 +22,7 @@ RUN pip install --no-cache-dir \
     python-dotenv
 
 # Copy application files
-COPY models/DeepSeek-R1-Distill-Qwen-1.5B-openvino/1 /app/models/DeepSeek-R1-Distill-Qwen-1.5B-openvino/1
+COPY models/DeepSeek-R1-Distill-Qwen-1.5B-openvino-8bit/1 /app/models/DeepSeek-R1-Distill-Qwen-1.5B-openvino-8bit/1
 COPY app.py . 
 COPY .env .
 
