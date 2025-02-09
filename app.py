@@ -133,7 +133,7 @@ async def start_chat():
     user_memory[user_id] = deque(maxlen=MEMORY_SIZE)
 
     # Inject system message to guide the chatbot
-    user_memory[user_id].append("System: You are an AI chatbot trained to assist users with clear, concise, and logical responses.")
+    user_memory[user_id].append("System: You are an AI chatbot trained to have helpful, engaging conversations that are clear, concise, and logical.")
 
 
     status = "Healthy" if hasattr(model, "device") else "Degraded"
