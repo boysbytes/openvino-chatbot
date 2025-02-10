@@ -1,7 +1,12 @@
 import chainlit as cl
 import logging
 import os
+import os
+os.environ["LANG"] = "en_US.UTF-8"
+os.environ["LC_ALL"] = "en_US.UTF-8"
+
 import asyncio
+import re
 from pathlib import Path
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
@@ -16,8 +21,8 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 
 # Load environment variables with defaults
-MODEL_PATH = os.getenv('MODEL_PATH', '/app/models/DeepSeek-R1-Distill-Qwen-1.5B-openvino-8bit/1')
-TOKENIZER_MODEL = os.getenv('TOKENIZER_MODEL', 'boysbytes/DeepSeek-R1-Distill-Qwen-1.5B-openvino-8bit')
+MODEL_PATH = os.getenv('MODEL_PATH', '/app/models/DeepSeek-R1-Distill-Qwen-1.5B-openvino-4bit/1')
+TOKENIZER_MODEL = os.getenv('TOKENIZER_MODEL', '/app/models/DeepSeek-R1-Distill-Qwen-1.5B-openvino-4bit/1')
 DEFAULT_TEMPERATURE = float(os.getenv('DEFAULT_TEMPERATURE', 0.7))
 MAX_LENGTH = int(os.getenv('MAX_LENGTH', 8192))
 THREADS = int(os.getenv('INFERENCE_THREADS', 12))
@@ -25,21 +30,10 @@ MAX_WORKERS = int(os.getenv('MAX_WORKERS', 8))
 MEMORY_SIZE = int(os.getenv('MEMORY_SIZE', 3))  # Keeps last 3 interactions
 MAX_NEW_TOKENS = int(os.getenv('MAX_NEW_TOKENS', 4096))
 
-# Prompt Template
-PROMPT_TEMPLATE = """{conversation_history}
-User: {user_input}
-AI:"""
-
-
-# Function to format the prompt with conversation history
-def format_prompt(user_input, memory):
-    conversation_history = "\n".join(memory) if memory else ""
-
-    # Trim history dynamically to fit within `MAX_LENGTH`
-    while len(tokenizer(conversation_history + user_input)["input_ids"]) > MAX_LENGTH - 2048 and memory:
-        memory.popleft()
-
-    return PROMPT_TEMPLATE.format(conversation_history=conversation_history, user_input=user_input)
+# Function to remove AI reasoning (if user disables it)
+def clean_ai_response(response):
+    """Remove AI reasoning thoughts enclosed within <think>...</think> tags."""
+    return re.sub(r"<think>.*?</think>", "", response, flags=re.DOTALL).strip()
 
 # Validate model files
 def validate_model(model_path: str):
@@ -85,8 +79,8 @@ try:
     )
     model.compile()
 
-    # Load tokenizer dynamically from .env
-    tokenizer = AutoTokenizer.from_pretrained(TOKENIZER_MODEL)
+    # Load tokenizer from local directory (no downloading)
+    tokenizer = AutoTokenizer.from_pretrained(TOKENIZER_MODEL, local_files_only=True)
     tokenizer.pad_token_id = tokenizer.eos_token_id
 
     logging.info(f"Model and tokenizer loaded successfully with {THREADS} inference threads")
@@ -96,7 +90,13 @@ except Exception as e:
 
 # Generate response with memory
 def safe_generate_response(prompt, memory, temperature=DEFAULT_TEMPERATURE):
-    formatted_prompt = format_prompt(prompt, memory)
+    conversation_history = "\n".join(memory) if memory else ""
+
+    # Trim history dynamically to fit within `MAX_LENGTH`
+    while len(tokenizer(conversation_history + prompt)["input_ids"]) > MAX_LENGTH - 1024 and memory:
+        memory.popleft()  # Remove oldest messages
+
+    formatted_prompt = f"{conversation_history}\nUser: {prompt}\nAI:"
 
     inputs = tokenizer(formatted_prompt, return_tensors="pt", padding=True, truncation=True)
 
@@ -107,6 +107,7 @@ def safe_generate_response(prompt, memory, temperature=DEFAULT_TEMPERATURE):
         top_p=0.9,
         do_sample=True
     )
+
     return tokenizer.decode(outputs[0], skip_special_tokens=True)
 
 # ThreadPoolExecutor for parallel processing
@@ -123,7 +124,7 @@ async def generate_response_async(user_id, prompt, temperature=DEFAULT_TEMPERATU
         lambda: safe_generate_response(prompt, user_memory[user_id], temperature=temperature)
     )
 
-# Startup message with session reset
+# Startup message with toggle instructions
 @cl.on_chat_start
 async def start_chat():
     user_id = str(os.urandom(16))  # Generate unique session ID
@@ -132,14 +133,14 @@ async def start_chat():
     # Reset user memory for new session
     user_memory[user_id] = deque(maxlen=MEMORY_SIZE)
 
-    # Inject system message to guide the chatbot
-    user_memory[user_id].append("System: You are an AI chatbot trained to have helpful, engaging conversations that are clear, concise, and logical.")
-
+    # Default: Show AI's reasoning
+    cl.user_session.set("show_thinking", True)
 
     status = "Healthy" if hasattr(model, "device") else "Degraded"
-    await cl.Message(f"System ready | Status: {status} | Threads: {THREADS} | Memory Size: {MEMORY_SIZE} exchanges").send()
+    await cl.Message(f"System ready | Status: {status} | Threads: {THREADS} | Memory Size: {MEMORY_SIZE} exchanges.\n"
+                     f"Type `/hide_thinking` to remove AI's reasoning or `/show_thinking` to enable it (default).").send()
 
-# Handle user messages
+# Handle user messages and toggle AI reasoning
 @cl.on_message
 async def handle_message(message: cl.Message):
     try:
@@ -151,16 +152,37 @@ async def handle_message(message: cl.Message):
         if user_id not in user_memory:
             user_memory[user_id] = deque(maxlen=MEMORY_SIZE)
 
+        # **Check for user toggle commands**
+        if message.content.strip().lower() == "/hide_thinking":
+            cl.user_session.set("show_thinking", False)
+            await cl.Message("AI reasoning is now **hidden**. Type `/show_thinking` to enable it again.").send()
+            return
+        elif message.content.strip().lower() == "/show_thinking":
+            cl.user_session.set("show_thinking", True)
+            await cl.Message("AI reasoning is now **visible**. Type `/hide_thinking` to disable it again.").send()
+            return
+
+        # Get user's preference for AI reasoning visibility
+        show_thinking = cl.user_session.get("show_thinking", True)
+
         user_temp = float(message.metadata.get("temperature", DEFAULT_TEMPERATURE))
 
         # Generate response with memory
         response = await generate_response_async(user_id, message.content, temperature=user_temp)
 
-        # Save interaction in memory
-        user_memory[user_id].append(f"User: {message.content}")
-        user_memory[user_id].append(f"AI: {response}")
+        # **Always strip AI reasoning when storing in memory**
+        clean_response = clean_ai_response(response)
 
-        await cl.Message(response).send()
+        # **Show full response only if user enabled AI thinking**
+        response_to_user = response if show_thinking else clean_response
+
+        # **Store only the cleaned AI response in memory**
+        user_memory[user_id].append(f"User: {message.content}")
+        user_memory[user_id].append(f"AI: {clean_response}")  # Always store the cleaned response
+
+        # Send response based on toggle setting
+        await cl.Message(response_to_user).send()
+
     except Exception as e:
         await cl.Message(f"Error processing request: {str(e)}").send()
         raise

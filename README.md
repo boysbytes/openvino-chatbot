@@ -25,9 +25,9 @@ This is a chatbot powered by [**OpenVINO**](https://www.intel.com/content/www/us
     python3 download_model.py
     ```
 
-    When prompted, enter the path of the model repo, for example, `https://huggingface.co/boysbytes/DeepSeek-R1-Distill-Qwen-1.5B-openvino-8bit`
+    When prompted, enter the path of the model repo, for example, `https://huggingface.co/boysbytes/DeepSeek-R1-Distill-Qwen-1.5B-openvino-4bit`
 
-    The model files will be saved to `models/DeepSeek-R1-Distill-Qwen-1.5B-openvino-8bit/1`
+    The model files will be saved to `models/DeepSeek-R1-Distill-Qwen-1.5B-openvino-4bit/1`
 
 2. Build and run the service.
 
@@ -39,7 +39,6 @@ This is a chatbot powered by [**OpenVINO**](https://www.intel.com/content/www/us
 ## Usage
 
 1. Access the chatbot: `http://localhost:3000`
-
 
 2. When you're done, stop and clean-up.
 
@@ -54,13 +53,14 @@ The following are the environment variables you can customize in `.env`.
 
 | Variable           | Default Value | Description |
 |--------------------|--------------|-------------|
-| `MODEL_PATH`      | `/app/models/DeepSeek-R1-Distill-Qwen-1.5B-openvino-8bit/1` | Path to OpenVINO model |
+| `MODEL_PATH`      | `/app/models/DeepSeek-R1-Distill-Qwen-1.5B-openvino-4bit/1` | Path to OpenVINO model |
 | `DEFAULT_TEMPERATURE` | `0.7` | Controls response randomness |
 | `MAX_LENGTH`      | `8192` | Max input size |
 | `INFERENCE_THREADS` | `12` | OpenVINO inference threads |
 | `MAX_WORKERS`     | `8` | Parallel request handling |
 | `MEMORY_SIZE`     | `3` | Number of previous exchanges to remember |
 | `MAX_NEW_TOKENS`     | `4096` | Max response size |
+| `TOKENIZER_MODEL`     | `boysbytes/DeepSeek-R1-Distill-Qwen-1.5B-openvino-4bit/1` | Specific tokenizer to preprocess text input |
 
 ### Change the model
 
@@ -72,7 +72,7 @@ The following are the environment variables you can customize in `.env`.
 
     When prompted, enter the path of the model repo, for example, `https://huggingface.co/boysbytes/DeepSeek-R1-Distill-Qwen-1.5B-openvino-8bit`.
 
-2. Update the model path in `.env`. 
+2. Update the model and tokenizer path in `.env`. 
 
 ## Troubleshooting
 
